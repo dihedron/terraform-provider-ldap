@@ -41,10 +41,11 @@ func resourceLDAPObject() *schema.Resource {
 				Required:    true,
 			},
 			"attributes": &schema.Schema{
-				Type:        schema.TypeSet,
-				Description: "The map of attributes of this object; each attribute can be multi-valued.",
-				Set:         attributeHash,
-				MinItems:    0,
+				Type:             schema.TypeSet,
+				Description:      "The map of attributes of this object; each attribute can be multi-valued.",
+				Set:              attributeHash,
+				MinItems:         0,
+				DiffSuppressFunc: attributeDiffSuppressFunc,
 
 				Elem: &schema.Schema{
 					Type:        schema.TypeMap,
@@ -58,8 +59,30 @@ func resourceLDAPObject() *schema.Resource {
 				},
 				Optional: true,
 			},
+			"computed": &schema.Schema{
+				Type:        schema.TypeMap,
+				Computed:    true,
+				Description: "An internal map to keep track of server-computed attributes, not to be tanmpered with.",
+				Elem: &schema.Schema{
+					Type:        schema.TypeBool,
+					Description: "Whether the attribute was in the original schema",
+				},
+			},
 		},
 	}
+}
+
+func attributeDiffSuppressFunc(key, old, new string, d *schema.ResourceData) bool {
+	log.Printf("[DEBUG] suppress_func - %q: %q => %q", key, old, new)
+	computed := d.Get("compute")
+	log.Printf("[DEBUG] computed map is %T", computed)
+
+	// for k, v := range computed {
+	// 	if k == key && v {
+	// 		return true
+	// 	}
+	// }
+	return false
 }
 
 func resourceLDAPObjectImport(d *schema.ResourceData, meta interface{}) (imported []*schema.ResourceData, err error) {

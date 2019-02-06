@@ -6,7 +6,7 @@ If you want to hack this plugin, you need to have a working Golang build enviorn
 
 Terraform has its own mechanism for enabling traces, as detailed [here](https://www.terraform.io/docs/internals/debugging.html).
 
-This plugin logs to `stdout`, and its outputs are collected by terrafiorm and interleaved with those of the internal engine.
+This plugin logs to `stdout`, and its outputs are collected by Terraform and interleaved with those of the internal engine.
 
 To enable logging, define the `TF_LOG` and optionally the `TF_LOG_PATH` environment variables before running the command, e.g.:
 
