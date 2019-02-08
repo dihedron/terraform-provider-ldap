@@ -1,4 +1,4 @@
-# Terraform LDAP 
+# Terraform LDAP Provider
 
 [![CircleCI](https://circleci.com/gh/dihedron/terraform-provider-ldap/tree/master.svg?style=svg)](https://circleci.com/gh/dihedron/terraform-provider-ldap/tree/master)
 
@@ -7,9 +7,15 @@
 This Terraform provider is a fork of [a previous implementation by Pryz](https://github.com/Pryz/terraform-provider-ldap), which is still available.
 This fork is actively maintained.
 
-*Last updated: 2019-02-06*
+*Last updated: 2019-02-08*
 
 ## How to build and install
+
+This plugin is only distributed in source form. Building from the sources is easy once you have a sane Golang environment.
+
+It doesn't have any OS-specific features and it is pure Go: in principle it should run on any Golang-supported combination of operating system and system architecture, and it can be cross-compiled. 
+
+All development and testing happens on 64-bits Intel/AMD Linux systems.
 
 ### Build
 
@@ -26,7 +32,7 @@ Open a command prompt and run:
 ```bash
 $> go build github.com/dihedron/terraform-provider-ldap
 ```
-The newly build binary will be in the current directory.
+The newly built binary will be in the current directory.
 
 ### Installation
 
@@ -47,7 +53,6 @@ to make Terraform aware of the new plugin.
 
 You can find detailed instruction on [Hashicorp's website](https://www.terraform.io/docs/configuration/providers.html#third-party-plugins).
 
-
 ## Provider example
 
 ```
@@ -59,14 +64,13 @@ provider "ldap" {
     bind_password = "admin"
 }
 ```
-Note: if you want to use TLS, the LDAP port must be changed accordingly 
-(typically, port 636 is used for secure connections).
+Note: if you want to use TLS, the LDAP port must be changed accordingly (typically, port 636 is used for secure connections).
 
 ## Resource LDAP Object example
 
 ```
 resource "ldap_object" "foo" {
-    # DN must be complete (no RDN!)
+    # DN must be complete (no RDN!); this is the object's ID
     dn = "uid=foo,dc=example,dc=com"
 
     # classes are specified as an array
@@ -119,4 +123,12 @@ Then merge this file with your existing `.tf` file(s).
 
 ## Limitations
 
-This provider supports TLS, but certificate verification is not enabled yet; all connections are through TCP, no UDP support yet.
+This provider supports TLS, but certificate verification is not enabled yet. 
+
+All connections are through TCP, no UDP support yet. 
+
+It hasn't been tested against an Active Directory server by the author; if you have one available and you test it, please provide feedback.
+
+## Contributing
+
+The provider is released under an MIT license by its original author (Pryz); if you want to contribute with testing, examples, documentation or code, please do.

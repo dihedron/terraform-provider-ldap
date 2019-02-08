@@ -59,30 +59,50 @@ func resourceLDAPObject() *schema.Resource {
 				},
 				Optional: true,
 			},
-			"computed": &schema.Schema{
-				Type:        schema.TypeMap,
-				Computed:    true,
-				Description: "An internal map to keep track of server-computed attributes, not to be tanmpered with.",
-				Elem: &schema.Schema{
-					Type:        schema.TypeBool,
-					Description: "Whether the attribute was in the original schema",
-				},
-			},
+			// "_internal": &schema.Schema{
+			// 	Type:        schema.TypeSet,
+			// 	Computed:    true,
+			// 	Description: "A set that keeps track user-specified attributes; do not tamper with!",
+			// 	Elem: &schema.Schema{
+			// 		Type:        schema.TypeString,
+			// 		Description: "The name of the attribute in the original schema.",
+			// 	},
+			// 	Set: schema.HashString,
+			// },
 		},
 	}
 }
 
 func attributeDiffSuppressFunc(key, old, new string, d *schema.ResourceData) bool {
-	log.Printf("[DEBUG] suppress_func - %q: %q => %q", key, old, new)
-	computed := d.Get("compute")
-	log.Printf("[DEBUG] computed map is %T", computed)
 
-	// for k, v := range computed {
-	// 	if k == key && v {
-	// 		return true
-	// 	}
-	// }
-	return false
+	dn := d.Get("dn").(string)
+	key = key[strings.LastIndex(key, ".")+1:]
+	log.Printf("[DEBUG] ldap_object::diff_suppress - analysing object %q for %q (%q => %q) {", dn, key, old, new)
+
+	if key == "#" || key == "%" {
+		// number of attributes in map/set is calculated; it should not count by
+		// itself in deciding whether the object should be updated; they are a
+		// hint that something in the complex strcuture they refer to has changed;
+		// thus, we suppress it and we get a cleaner output from terraform.
+		log.Printf("[DEBUG] ldap_object::diff_suppress - }")
+		return true
+	}
+
+	if d.Get("_internal") != nil {
+		for _, existing := range d.Get("_internal").(*schema.Set).List() {
+			log.Printf("[DEBUG] ldap_object::diff_suppress -     existing attribute: %q", existing)
+			if key == existing {
+				log.Printf("[DEBUG] ldap_object::diff_suppress -     possibly updating %q", key)
+				return false
+			}
+		}
+	}
+
+	// ... otherwise this is probably a computed attribute, or one
+	// that was given a default by the LDAP server, so better skip it
+	log.Printf("[DEBUG] ldap_object::diff_suppress -     suppressing %q", key)
+	log.Printf("[DEBUG] ldap_object::diff_suppress - } ")
+	return true
 }
 
 func resourceLDAPObjectImport(d *schema.ResourceData, meta interface{}) (imported []*schema.ResourceData, err error) {
@@ -191,7 +211,7 @@ func resourceLDAPObjectCreate(d *schema.ResourceData, meta interface{}) error {
 
 	request := ldap.NewAddRequest(dn)
 
-	// retrieve classe from HCL
+	// retrieve classes from HCL
 	objectClasses := []string{}
 	for _, oc := range (d.Get("object_classes").(*schema.Set)).List() {
 		log.Printf("[DEBUG] ldap_object::create - object %q has class: %q", dn, oc.(string))
@@ -205,6 +225,7 @@ func resourceLDAPObjectCreate(d *schema.ResourceData, meta interface{}) error {
 	// due to an appareent limitation in HCL; we have a []map[string]string, so
 	// we loop through the list and accumulate values when they share the same
 	// key, then we use these as attributes in the LDAP client.
+	_internal := []string{}
 	if v, ok := d.GetOk("attributes"); ok {
 		attributes := v.(*schema.Set).List()
 		if len(attributes) > 0 {
@@ -218,9 +239,10 @@ func resourceLDAPObjectCreate(d *schema.ResourceData, meta interface{}) error {
 					m[name] = append(m[name], value.(string))
 				}
 			}
-			// now loop through the map and add attributes with theys value(s)
+			// now loop through the map and add attributes with their value(s)
 			for name, values := range m {
 				request.Attribute(name, values)
+				_internal = append(_internal, name)
 			}
 		}
 	}
@@ -233,6 +255,20 @@ func resourceLDAPObjectCreate(d *schema.ResourceData, meta interface{}) error {
 	log.Printf("[DEBUG] ldap_object::create - object %q added to LDAP server", dn)
 
 	d.SetId(dn)
+
+	// now explicitly store inside the "_internal" computed attribute
+	// the names of the attributes that were specified at creation time
+	// in the "attributes" map; only these attributes will be managed by
+	// this provider, so any server-provided attributes are not deleted
+	// because they are not in the local .tf file.
+	set := &schema.Set{
+		F: schema.HashString,
+	}
+	for _, value := range _internal {
+		set.Add(value)
+	}
+	d.Set("_internal", set)
+
 	return resourceLDAPObjectRead(d, meta)
 }
 
@@ -289,6 +325,9 @@ func resourceLDAPObjectUpdate(d *schema.ResourceData, meta interface{}) error {
 			log.Printf("[DEBUG] ldap_object::update - %d attributes removed", len(removed))
 			request.DeleteAttributes = removed
 		}
+
+		// now we need to add and remove attributes that were removed
+		// in the map.
 	}
 
 	err = client.Modify(request)
@@ -376,15 +415,17 @@ func readLDAPObjectImpl(d *schema.ResourceData, meta interface{}, updateState bo
 			log.Printf("[DEBUG] ldap_object::read - skipping attribute %q of %q", attribute.Name, dn)
 			continue
 		}
-		// FIXME: testing if this fixes issue #1.
-		if len(attribute.Values) == 1 {
-			// we don't treat the RDN as an ordinary attribute
-			a := fmt.Sprintf("%s=%s", attribute.Name, attribute.Values[0])
-			if strings.HasPrefix(dn, a) {
-				log.Printf("[DEBUG] ldap_object::read - skipping RDN %q of %q", a, dn)
-				continue
+		/*
+			// FIXME: testing if this fixes issue #3.
+			if len(attribute.Values) == 1 {
+				// we don't treat the RDN as an ordinary attribute
+				a := fmt.Sprintf("%s=%s", attribute.Name, attribute.Values[0])
+				if strings.HasPrefix(dn, a) {
+					log.Printf("[DEBUG] ldap_object::read - skipping RDN %q of %q", a, dn)
+					continue
+				}
 			}
-		}
+		*/
 
 		log.Printf("[DEBUG] ldap_object::read - adding attribute %q to %q (%d values)", attribute.Name, dn, len(attribute.Values))
 		// now add each value as an individual entry into the object, because
@@ -412,7 +453,7 @@ func attributeHash(v interface{}) int {
 	var buffer bytes.Buffer
 	buffer.WriteString("map {")
 	for k, v := range m {
-		buffer.WriteString(fmt.Sprintf("%q := %q;", k, v.(string)))
+		buffer.WriteString(fmt.Sprintf("%q := %q;", k /* FIXME: strings.ToLower(k)*/, v.(string)))
 	}
 	buffer.WriteRune('}')
 	text := buffer.String()
@@ -466,7 +507,7 @@ func computeDeltas(os, ns *schema.Set) (added, changed, removed []ldap.PartialAt
 			// been added back, and there is no further value under the same
 			// name among those that were untouched; this means that it has
 			// been dropped and must go among the RemovedAttributes
-			log.Printf("[DEBUG} ldap_object::deltas - dropping attribute %q", k)
+			log.Printf("[DEBUG] ldap_object::deltas - dropping attribute %q", k)
 			removed = append(removed, ldap.PartialAttribute{
 				Type: k,
 				Vals: []string{},
@@ -494,7 +535,7 @@ func computeDeltas(os, ns *schema.Set) (added, changed, removed []ldap.PartialAt
 				Type: k,
 				Vals: values,
 			})
-			log.Printf("[DEBUG} ldap_object::deltas - adding new attribute %q with values %v", k, values)
+			log.Printf("[DEBUG] ldap_object::deltas - adding new attribute %q with values %v", k, values)
 		} else {
 			ck.Add(k)
 		}
@@ -518,7 +559,7 @@ func computeDeltas(os, ns *schema.Set) (added, changed, removed []ldap.PartialAt
 			Type: k,
 			Vals: values,
 		})
-		log.Printf("[DEBUG} ldap_object::deltas - changing attribute %q with values %v", k, values)
+		log.Printf("[DEBUG] ldap_object::deltas - changing attribute %q with values %v", k, values)
 	}
 	return
 }
