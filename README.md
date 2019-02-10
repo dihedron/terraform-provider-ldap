@@ -1,4 +1,4 @@
-# Terraform LDAP 
+# Terraform LDAP
 
 [![Build Status](https://circleci.com/gh/dihedron/terraform-provider-ldap/tree/master.svg?style=shield)](https://circleci.com/gh/dihedron/terraform-provider-ldap/tree/master)
 [![GitHub license](https://img.shields.io/github/license/dihedron/terraform-provider-ldap.svg)](https://github.com/dihedron/terraform-provider-ldap/blob/master/LICENSE)
@@ -27,10 +27,13 @@ $> go get -d -u github.com/dihedron/terraform-provider-ldap
 $> go get -d -u github.com/hashicorp/terraform
 $> go get -d -u gopkg.in/ldap.v2
 ```
+
 Open a command prompt and run:
+
 ```bash
 $> go build github.com/dihedron/terraform-provider-ldap
 ```
+
 The newly build binary will be in the current directory.
 
 ### Installation
@@ -52,10 +55,9 @@ to make Terraform aware of the new plugin.
 
 You can find detailed instruction on [Hashicorp's website](https://www.terraform.io/docs/configuration/providers.html#third-party-plugins).
 
-
 ## Provider example
 
-```
+```hcl
 provider "ldap" {
     ldap_host = "ldap.example.org"
     ldap_port = 389
@@ -64,12 +66,12 @@ provider "ldap" {
     bind_password = "admin"
 }
 ```
-Note: if you want to use TLS, the LDAP port must be changed accordingly 
-(typically, port 636 is used for secure connections).
+
+Note: if you want to use TLS, the LDAP port must be changed accordingly (typically, port 636 is used for secure connections).
 
 ## Resource LDAP Object example
 
-```
+```hcl
 resource "ldap_object" "foo" {
     # DN must be complete (no RDN!)
     dn = "uid=foo,dc=example,dc=com"
