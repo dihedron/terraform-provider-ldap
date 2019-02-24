@@ -7,13 +7,13 @@
 This Terraform provider is a fork of [a previous implementation by Pryz](https://github.com/Pryz/terraform-provider-ldap), which is still available.
 This fork is actively maintained.
 
-*Last updated: 2019-02-08*
+*Last updated: 2019-02-24*
 
 ## How to build and install
 
 This plugin is only distributed in source form. Building from the sources is easy once you have a sane Golang environment.
 
-It doesn't have any OS-specific features and it is pure Go: in principle it should run on any Golang-supported combination of operating system and system architecture, and it can be cross-compiled. 
+It doesn't have any OS-specific features and it is pure Go: in principle it should run on any Golang-supported combination of operating system and system architecture, and it can be cross-compiled.
 
 All development and testing happens on 64-bits Intel/AMD Linux systems.
 
@@ -21,17 +21,20 @@ All development and testing happens on 64-bits Intel/AMD Linux systems.
 
 In order to build this plugin, you need to have a working setup of Golang; you can find detailed instructions on [Golang's website](https://golang.org/doc/install).
 
-This project does not use Golang modules (`go mod`) yet, so you need to manually get the plugin sources (along with those of Terraform and the LDAP client) like this: 
+This project does not use Golang modules (`go mod`) yet, so you need to manually get the plugin sources (along with those of Terraform and the LDAP client) like this:
 
 ```bash
 $> go get -d -u github.com/dihedron/terraform-provider-ldap
 $> go get -d -u github.com/hashicorp/terraform
 $> go get -d -u gopkg.in/ldap.v2
 ```
+
 Open a command prompt and run:
+
 ```bash
 $> go build github.com/dihedron/terraform-provider-ldap
 ```
+
 The newly built binary will be in the current directory.
 
 ### Installation
@@ -131,4 +134,46 @@ It hasn't been tested against an Active Directory server by the author; if you h
 
 ## Contributing
 
-The provider is released under an MIT license by its original author (Pryz); if you want to contribute with testing, examples, documentation or code, please do.
+The provider is released under an MIT license by its original author (Pryz); if you want to contribute with testing, examples, documentation or code, please read the following sections; all pull requests will be accurately considered.
+
+## Hacking
+
+If you want to hack this plugin, you need to have a working Golang build environment (see the [Golang website](https://golang.org/doc/install)) to get started.
+
+### Developing
+
+In order to develop the plugin, you should check out the `terraform` sources under `$GOPATH/src/github.com/hashicorp/terrafom` and compile them; then, you should compile the plugin using the `go build` or `go install`.
+
+### Sideloading the development plugin
+
+No matter how you compile the plugin, you must then create a symbolic link to the plugin in the Terraform plugins directory (e.g. `~/terraform.d/plugins/`). This will make the plugin accessible to Terraform.
+
+### Running the tests
+
+Tu run the integration tests, move to the `tests/` subdirectory and start the OpenLDAP server and its web administration console:
+
+```bash
+$> docker-compose up
+```
+
+then run:
+
+```bash
+$> terraform init
+```
+
+This command will make Terraform aware of the new plugin. 
+
+**NOTE**: You will have to re-run it every time you change and rebuild the plugin.
+
+### Enabling traces
+
+Terraform has its own mechanism for enabling traces, as detailed [here](https://www.terraform.io/docs/internals/debugging.html).
+
+This plugin logs to `stdout`, and its outputs are collected by Terraform and interleaved with those of the internal engine.
+
+To enable logging, define the `TF_LOG` and optionally the `TF_LOG_PATH` environment variables before running the command, e.g.:
+
+```bash
+$> TF_LOG=TRACE TF_LOG_PATH=./terraform.log terraform plan
+```

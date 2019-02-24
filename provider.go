@@ -78,7 +78,7 @@ type binding struct {
 // cache is the lazily initialized connection, returned from the first Bind call.
 var cache *binding
 
-// once guards the binding logic against concurrent an reiterated invocations.
+// once guards the binding logic against concurrent and reiterated invocations.
 var once sync.Once
 
 // LDAPProvider is the set of parameters needed to configure the LDAP provider.
