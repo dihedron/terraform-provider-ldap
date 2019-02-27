@@ -39,7 +39,7 @@ resource "ldap_object" "a123456" {
 		{ displayName	= "Mr. John K. Doe, esq."},
 		{ mail 			= "john.doe@example.com" },
 		{ mail			= "a123456@internal.example.com" },
-#		{ mail			= "jdoe@example.com" },
+		{ mail			= "jdoe@example.com" },
 		{ userPassword  = "password" },
 #		{ description	= "The best programmer in the world." },
 		{ uidNumber		= "1234" },

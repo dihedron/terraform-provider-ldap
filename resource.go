@@ -20,13 +20,13 @@ import (
 func DescribeLDAPObject() *schema.Resource {
 	return &schema.Resource{
 		Create: CreateResource,
-		Read:   ReadLDAPObject,
-		Update: UpdateLDAPObject,
-		Delete: DeleteLDAPObject,
-		Exists: ExistsLDAPObject,
+		Read:   ReadResource,
+		Update: UpdateResource,
+		Delete: DeleteResource,
+		Exists: ExistsResource,
 
 		Importer: &schema.ResourceImporter{
-			State: ImportLDAPObject,
+			State: ImportResource,
 		},
 
 		Schema: map[string]*schema.Schema{
@@ -100,27 +100,27 @@ func CreateResource(d *schema.ResourceData, meta interface{}) error {
 	// effect of reading back attributes that were not in the original request,
 	// such as those computed on the server or those that have a default value;
 	// in order to do so, the object's DN (the primary key) must be stored in
-	// the state so that the subsequent ReadLDAPObject knows what to look for
+	// the state so that the subsequent ReadResource knows what to look for
 	d.SetId(object.DN)
-	return ReadLDAPObject(d, meta)
+	return ReadResource(d, meta)
 }
 
-// ReadLDAPObject retrieves an object from the LDAP server, given its DN, and
+// ReadResource retrieves an object from the LDAP server, given its DN, and
 // stores it in the local state.
-func ReadLDAPObject(d *schema.ResourceData, meta interface{}) error {
+func ReadResource(d *schema.ResourceData, meta interface{}) error {
 	return readLDAPObject(d, meta, true)
 }
 
-// UpdateLDAPObject updates the remote version of an LDAP object according to
+// UpdateResource updates the remote version of an LDAP object according to
 // the updated information available in the local .tf file.
-func UpdateLDAPObject(d *schema.ResourceData, meta interface{}) error {
+func UpdateResource(d *schema.ResourceData, meta interface{}) error {
 	provider := meta.(*LDAPProvider)
 	conn, err := provider.Bind()
 	if err != nil {
 		log.Printf("[ERROR] - error getting connection to provider: %v", err)
 		return err
 	}
-	log.Printf("[DEBUG] UpdateLDAPObject - performing update on object %q", d.Get("dn").(string))
+	log.Printf("[DEBUG] UpdateResource - performing update on object %q", d.Get("dn").(string))
 
 	request := ldap.NewModifyRequest(d.Id())
 
@@ -130,7 +130,7 @@ func UpdateLDAPObject(d *schema.ResourceData, meta interface{}) error {
 		for _, oc := range (d.Get("object_classes").(*schema.Set)).List() {
 			classes = append(classes, oc.(string))
 		}
-		log.Printf("[DEBUG] UpdateLDAPObject - updating classes of %q, new value: %v", d.Id(), classes)
+		log.Printf("[DEBUG] UpdateResource - updating classes of %q, new value: %v", d.Id(), classes)
 		request.ReplaceAttributes = []ldap.PartialAttribute{
 			ldap.PartialAttribute{
 				Type: "objectClass",
@@ -141,16 +141,16 @@ func UpdateLDAPObject(d *schema.ResourceData, meta interface{}) error {
 
 	if d.HasChange("attributes") {
 		o, n := d.GetChange("attributes")
-		log.Printf("[DEBUG] UpdateLDAPObject - \n%s", printAttributes("old attributes map", o))
-		log.Printf("[DEBUG] UpdateLDAPObject - \n%s", printAttributes("new attributes map", n))
+		log.Printf("[DEBUG] UpdateResource - \n%s", printAttributes("old attributes map", o))
+		log.Printf("[DEBUG] UpdateResource - \n%s", printAttributes("new attributes map", n))
 
 		added, changed, removed := computeDeltas(o.(*schema.Set), n.(*schema.Set))
 		if len(added) > 0 {
-			log.Printf("[DEBUG] UpdateLDAPObject - %d attributes added", len(added))
+			log.Printf("[DEBUG] UpdateResource - %d attributes added", len(added))
 			request.AddAttributes = added
 		}
 		if len(changed) > 0 {
-			log.Printf("[DEBUG] UpdateLDAPObject - %d attributes changed", len(changed))
+			log.Printf("[DEBUG] UpdateResource - %d attributes changed", len(changed))
 			if request.ReplaceAttributes == nil {
 				request.ReplaceAttributes = changed
 			} else {
@@ -158,30 +158,30 @@ func UpdateLDAPObject(d *schema.ResourceData, meta interface{}) error {
 			}
 		}
 		if len(removed) > 0 {
-			log.Printf("[DEBUG] UpdateLDAPObject - %d attributes removed", len(removed))
+			log.Printf("[DEBUG] UpdateResource - %d attributes removed", len(removed))
 			request.DeleteAttributes = removed
 		}
 	}
 
 	err = conn.Modify(request)
 	if err != nil {
-		log.Printf("[ERROR] UpdateLDAPObject - error modifying LDAP object %q with values %v", d.Id(), err)
+		log.Printf("[ERROR] UpdateResource - error modifying LDAP object %q with values %v", d.Id(), err)
 		return err
 	}
-	return ReadLDAPObject(d, meta)
+	return ReadResource(d, meta)
 }
 
-// DeleteLDAPObject deletes an object in the bound LDAP server given its DN.
-func DeleteLDAPObject(d *schema.ResourceData, meta interface{}) error {
+// DeleteResource deletes an object in the bound LDAP server given its DN.
+func DeleteResource(d *schema.ResourceData, meta interface{}) error {
 	provider := meta.(*LDAPProvider)
 	conn, err := provider.Bind()
 	if err != nil {
-		log.Printf("[ERROR] DeleteLDAPObject - error getting connection to provider: %v", err)
+		log.Printf("[ERROR] DeleteResource - error getting connection to provider: %v", err)
 		return err
 	}
 
 	dn := d.Get("dn").(string)
-	log.Printf("[DEBUG] DeleteLDAPObject - removing object %q", dn)
+	log.Printf("[DEBUG] DeleteResource - removing object %q", dn)
 
 	request := ldap.NewDelRequest(dn, nil)
 
@@ -194,18 +194,18 @@ func DeleteLDAPObject(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-// ExistsLDAPObject checks if an object exists on the bound LDAP server.
-func ExistsLDAPObject(d *schema.ResourceData, meta interface{}) (b bool, e error) {
+// ExistsResource checks if an object exists on the bound LDAP server.
+func ExistsResource(d *schema.ResourceData, meta interface{}) (b bool, e error) {
 	provider := meta.(*LDAPProvider)
 	conn, err := provider.Bind()
 	if err != nil {
-		log.Printf("[ERROR] ExistsLDAPObject - error getting connection to provider: %v", err)
+		log.Printf("[ERROR] ExistsResource - error getting connection to provider: %v", err)
 		return false, err
 	}
 
 	dn := d.Get("dn").(string)
 
-	log.Printf("[DEBUG] ExistsLDAPObject - checking if object %q exists", dn)
+	log.Printf("[DEBUG] ExistsResource - checking if object %q exists", dn)
 
 	// search by primary key (that is, set the DN as base DN and use a "base
 	// object" scope); no attributes are retrieved since we are only checking
@@ -227,45 +227,45 @@ func ExistsLDAPObject(d *schema.ResourceData, meta interface{}) (b bool, e error
 	if err != nil {
 		if err, ok := err.(*ldap.Error); ok {
 			if err.ResultCode == 32 { // no such object
-				log.Printf("[INFO] ExistsLDAPObject - lookup for %q returned no value: deleted on server?", dn)
+				log.Printf("[INFO] ExistsResource - lookup for %q returned no value: deleted on server?", dn)
 				return false, nil
 			}
 		}
-		log.Printf("[DEBUG] ExistsLDAPObject - lookup for %q returned an error: %v", dn, err)
+		log.Printf("[DEBUG] ExistsResource - lookup for %q returned an error: %v", dn, err)
 		return false, err
 	}
 
-	log.Printf("[INFO] LDAPObjectExists - object %q exists", dn)
+	log.Printf("[INFO] ExistsResource - object %q exists", dn)
 	return true, nil
 }
 
-// ImportLDAPObject imports an LDAP object, given its DN; it can also produce
+// ImportResource imports an LDAP object, given its DN; it can also produce
 // a .tf file fragment.
-func ImportLDAPObject(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+func ImportResource(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
 	d.Set("dn", d.Id())
 	err := readLDAPObject(d, meta, false)
 	if err != nil {
-		log.Printf("[ERROR] ImportLDAPObject - error reading object %q", d.Id())
+		log.Printf("[ERROR] ImportResource - error reading object %q", d.Id())
 		return nil, err
 	}
 	path := os.Getenv("TF_LDAP_IMPORTER_PATH")
 	if path == "" {
-		log.Printf("[ERROR] ImportLDAPObject - no path specified")
+		log.Printf("[ERROR] ImportResource - no path specified")
 		return nil, err
 	}
 	if _, err := os.Stat(path); err == nil {
-		log.Printf("[ERROR] ImportLDAPObject - %q exists already on disk", path)
+		log.Printf("[ERROR] ImportResource - %q exists already on disk", path)
 		return nil, fmt.Errorf("object %q exists already on disk", path)
 	}
-	log.Printf("[DEBUG] ImportLDAPObject - dumping imported object to %q", path)
+	log.Printf("[DEBUG] ImportResource - dumping imported object to %q", path)
 
 	file, err := os.Create(path)
 	if err != nil {
-		log.Printf("[ERROR] ImportLDAPObject - error creating file %q: %v", path, err)
+		log.Printf("[ERROR] ImportResource - error creating file %q: %v", path, err)
 		return nil, err
 	}
 	defer file.Close()
-	log.Printf("[DEBUG] ImportLDAPObject - file %q open", path)
+	log.Printf("[DEBUG] ImportResource - file %q open", path)
 
 	var buffer bytes.Buffer
 	id := d.Id()
@@ -306,7 +306,7 @@ func ImportLDAPObject(d *schema.ResourceData, meta interface{}) ([]*schema.Resou
 
 	_, err = buffer.WriteTo(file)
 	if err != nil {
-		log.Printf("[DEBUG] ImportLDAPObject - error writing to file: %v", err)
+		log.Printf("[DEBUG] ImportResource - error writing to file: %v", err)
 	}
 	return []*schema.ResourceData{d}, err
 }
@@ -315,12 +315,12 @@ func readLDAPObject(d *schema.ResourceData, meta interface{}, updateState bool) 
 	provider := meta.(*LDAPProvider)
 	conn, err := provider.Bind()
 	if err != nil {
-		log.Printf("[ERROR] DeleteLDAPObject - error getting connection to provider: %v", err)
+		log.Printf("[ERROR] readLDAPObject - error getting connection to provider: %v", err)
 		return err
 	}
 	dn := d.Get("dn").(string)
 
-	log.Printf("[DEBUG] ldap_object::read - looking for object %q", dn)
+	log.Printf("[DEBUG] readLDAPObject - looking for object %q", dn)
 
 	// when searching by DN, you don't need to specify the base DN, a search
 	// filter and a "subtree" scope: just put the DN (i.e. the primary key) as
@@ -342,16 +342,16 @@ func readLDAPObject(d *schema.ResourceData, meta interface{}, updateState bool) 
 	if err != nil {
 		if err, ok := err.(*ldap.Error); ok {
 			if err.ResultCode == 32 && updateState { // no such object
-				log.Printf("[WARN] ldap_object::read - object not found, removing %q from state because it no longer exists in LDAP", dn)
+				log.Printf("[WARN] readLDAPObject - object not found, removing %q from state because it no longer exists in LDAP", dn)
 				d.SetId("")
 				return nil
 			}
 		}
-		log.Printf("[DEBUG] ldap_object::read - lookup for %q returned an error %v", dn, err)
+		log.Printf("[DEBUG] readLDAPObject - lookup for %q returned an error %v", dn, err)
 		return err
 	}
 
-	log.Printf("[DEBUG] ldap_object::read - query for %q returned %v", dn, sr)
+	log.Printf("[DEBUG] readLDAPObject - query for %q returned %v", dn, sr)
 
 	d.SetId(dn)
 	d.Set("object_classes", sr.Entries[0].GetAttributeValues("objectClass"))
@@ -362,10 +362,10 @@ func readLDAPObject(d *schema.ResourceData, meta interface{}, updateState bool) 
 	}
 
 	for _, attribute := range sr.Entries[0].Attributes {
-		log.Printf("[DEBUG] ldap_object::read - treating attribute %q of %q (%d values: %v)", attribute.Name, dn, len(attribute.Values), attribute.Values)
+		log.Printf("[DEBUG] readLDAPObject - treating attribute %q of %q (%d values: %v)", attribute.Name, dn, len(attribute.Values), attribute.Values)
 		if attribute.Name == "objectClass" {
 			// skip: we don't treat object classes as ordinary attributes
-			log.Printf("[DEBUG] ldap_object::read - skipping attribute %q of %q", attribute.Name, dn)
+			log.Printf("[DEBUG] readLDAPObject - skipping attribute %q of %q", attribute.Name, dn)
 			continue
 		}
 		// FIXME: testing if this fixes issue #1.
@@ -373,18 +373,18 @@ func readLDAPObject(d *schema.ResourceData, meta interface{}, updateState bool) 
 			// we don't treat the RDN as an ordinary attribute
 			a := fmt.Sprintf("%s=%s", attribute.Name, attribute.Values[0])
 			if strings.HasPrefix(dn, a) {
-				log.Printf("[DEBUG] ldap_object::read - skipping RDN %q of %q", a, dn)
+				log.Printf("[DEBUG] readLDAPObject - skipping RDN %q of %q", a, dn)
 				continue
 			}
 		}
 
-		log.Printf("[DEBUG] ldap_object::read - adding attribute %q to %q (%d values)", attribute.Name, dn, len(attribute.Values))
+		log.Printf("[DEBUG] readLDAPObject - adding attribute %q to %q (%d values)", attribute.Name, dn, len(attribute.Values))
 		// now add each value as an individual entry into the object, because
 		// we do not handle name => []values, and we have a set of maps each
 		// holding a single entry name => value; multiple maps may share the
 		// same key.
 		for _, value := range attribute.Values {
-			log.Printf("[DEBUG] ldap_object::read - for %q, setting %q => %q", dn, attribute.Name, value)
+			log.Printf("[DEBUG] readLDAPObject - for %q, setting %q => %q", dn, attribute.Name, value)
 			set.Add(map[string]interface{}{
 				attribute.Name: value,
 			})
@@ -392,7 +392,7 @@ func readLDAPObject(d *schema.ResourceData, meta interface{}, updateState bool) 
 	}
 
 	if err := d.Set("attributes", set); err != nil {
-		log.Printf("[WARN] ldap_object::read - error setting LDAP attributes for %q : %v", dn, err)
+		log.Printf("[WARN] readLDAPObject - error setting LDAP attributes for %q : %v", dn, err)
 		return err
 	}
 	return nil
@@ -450,10 +450,10 @@ func searchLDAPObject(dn string, meta interface{}, updateState bool) (*LDAPObjec
 	// }
 
 	// for _, attribute := range sr.Entries[0].Attributes {
-	// 	log.Printf("[DEBUG] ldap_object::read - treating attribute %q of %q (%d values: %v)", attribute.Name, dn, len(attribute.Values), attribute.Values)
+	// 	log.Printf("[DEBUG] readLDAPObject - treating attribute %q of %q (%d values: %v)", attribute.Name, dn, len(attribute.Values), attribute.Values)
 	// 	if attribute.Name == "objectClass" {
 	// 		// skip: we don't treat object classes as ordinary attributes
-	// 		log.Printf("[DEBUG] ldap_object::read - skipping attribute %q of %q", attribute.Name, dn)
+	// 		log.Printf("[DEBUG] readLDAPObject - skipping attribute %q of %q", attribute.Name, dn)
 	// 		continue
 	// 	}
 	// 	// FIXME: testing if this fixes issue #1.
@@ -461,18 +461,18 @@ func searchLDAPObject(dn string, meta interface{}, updateState bool) (*LDAPObjec
 	// 		// we don't treat the RDN as an ordinary attribute
 	// 		a := fmt.Sprintf("%s=%s", attribute.Name, attribute.Values[0])
 	// 		if strings.HasPrefix(dn, a) {
-	// 			log.Printf("[DEBUG] ldap_object::read - skipping RDN %q of %q", a, dn)
+	// 			log.Printf("[DEBUG] readLDAPObject - skipping RDN %q of %q", a, dn)
 	// 			continue
 	// 		}
 	// 	}
 
-	// 	log.Printf("[DEBUG] ldap_object::read - adding attribute %q to %q (%d values)", attribute.Name, dn, len(attribute.Values))
+	// 	log.Printf("[DEBUG] readLDAPObject - adding attribute %q to %q (%d values)", attribute.Name, dn, len(attribute.Values))
 	// 	// now add each value as an individual entry into the object, because
 	// 	// we do not handle name => []values, and we have a set of maps each
 	// 	// holding a single entry name => value; multiple maps may share the
 	// 	// same key.
 	// 	for _, value := range attribute.Values {
-	// 		log.Printf("[DEBUG] ldap_object::read - for %q, setting %q => %q", dn, attribute.Name, value)
+	// 		log.Printf("[DEBUG] readLDAPObject - for %q, setting %q => %q", dn, attribute.Name, value)
 	// 		set.Add(map[string]interface{}{
 	// 			attribute.Name: value,
 	// 		})
@@ -480,7 +480,7 @@ func searchLDAPObject(dn string, meta interface{}, updateState bool) (*LDAPObjec
 	// }
 
 	// if err := d.Set("attributes", set); err != nil {
-	// 	log.Printf("[WARN] ldap_object::read - error setting LDAP attributes for %q : %v", dn, err)
+	// 	log.Printf("[WARN] readLDAPObject - error setting LDAP attributes for %q : %v", dn, err)
 	// 	return err
 	// }
 	// return nil
