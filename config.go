@@ -21,6 +21,7 @@ type Config struct {
 var initiateAndBindResponse *InitiateAndBindResponse
 var once sync.Once
 
+// InitiateAndBindResponse struct
 type InitiateAndBindResponse struct {
 	Connection *ldap.Conn
 	Err        error
